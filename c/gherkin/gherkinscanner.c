@@ -25,6 +25,7 @@ typedef enum
 {
   GHERKIN_SCANNER_MODE_NONE,
   GHERKIN_SCANNER_MODE_TABLE,
+  GHERKIN_SCANNER_MODE_TAGS,
   GHERKIN_SCANNER_MODE_STEP
 } GherkinScannerMode;
 
@@ -35,8 +36,16 @@ typedef enum {
   GHERKIN_TOKEN_WHEN = G_TOKEN_LAST + 4,
   GHERKIN_TOKEN_THEN = G_TOKEN_LAST + 5,
   GHERKIN_TOKEN_TABLE = '|',
-  GHERKIN_TOKEN_COMMENT = '#'
+  GHERKIN_TOKEN_TAG = '@',
+  GHERKIN_TOKEN_AND = G_TOKEN_LAST + 6
 } GherkinToken;
+
+typedef struct
+{
+  guint column;
+  guint line;
+  char *name;
+} GherkinTag;
 
 typedef struct
 {
@@ -50,10 +59,20 @@ typedef struct
   gboolean scenarios;
   GherkinScannerMode mode;
 
+  GArray *scenario_tags;
+
   gint last_row_line;
   gint last_row_column;
 
+  GNode * root;
+
 } GherkinScannerContext;
+
+static void
+_free_tag (GherkinTag *tag)
+{
+  g_free (tag->name);
+}
 
 static void
 _free_context (GherkinScannerContext * ctx)
@@ -76,39 +95,35 @@ _new_context (gchar * text)
 
 /* define enumeration values to be returned for specific symbols */
 /* symbol array */
-static const struct
+typedef struct
 {
   gchar *symbol_name;
   guint symbol_token;
-} symbols[] = {
-  {
+} GherkinSymbols;
+
+static const GherkinSymbols symbols[] = {{
   "Scenario", GHERKIN_TOKEN_SCENARIO,}, {
-  "scenario", GHERKIN_TOKEN_SCENARIO,}, {
   "Feature", GHERKIN_TOKEN_FEATURE,}, {
-  "feature", GHERKIN_TOKEN_FEATURE,}, {
   "When", GHERKIN_TOKEN_WHEN,}, {
-  "when", GHERKIN_TOKEN_WHEN,}, {
   "Given", GHERKIN_TOKEN_GIVEN,}, {
-  "given", GHERKIN_TOKEN_GIVEN,}, {
   "Then", GHERKIN_TOKEN_THEN,}, {
-  "then", GHERKIN_TOKEN_THEN,}, {
   "|", GHERKIN_TOKEN_TABLE,}, {
-NULL, 0,},}, *symbol_p = symbols;
+  "And", GHERKIN_TOKEN_AND,}, {
+  "@", GHERKIN_TOKEN_TAG,}, {
+  NULL, 0,
+  },
+};
 
 static gboolean
 _is_gherkin_token (guint token)
 {
-  switch (token) {
-    case GHERKIN_TOKEN_FEATURE:
-    case GHERKIN_TOKEN_SCENARIO:
-    case GHERKIN_TOKEN_WHEN:
-    case GHERKIN_TOKEN_THEN:
-    case GHERKIN_TOKEN_TABLE:
-    case GHERKIN_TOKEN_GIVEN:
+  gint i;
+
+  for (i = 0; symbols[i].symbol_name; i++)
+    if (symbols[i].symbol_token == token)
       return TRUE;
-    default:
-      return FALSE;
-  }
+
+  return FALSE;
 }
 
 static gboolean
@@ -169,14 +184,53 @@ _end_cells (GScanner * scanner, GherkinScannerContext * ctx)
   ctx->last_row_column = -1;
 }
 
+static void
+_set_tag (GScanner * scanner, GherkinScannerContext * ctx, gint column,
+    guint line, gchar *name)
+{
+    BEGIN_OBJECT ("Tag");
+    _set_location (scanner, ctx, column, line);
+    json_builder_set_member_name (ctx->builder, "name");
+    json_builder_add_string_value (ctx->builder, name);
+    json_builder_set_member_name (ctx->builder, "type");
+    json_builder_add_string_value (ctx->builder, "Tag");
+    END_OBJECT ("Tag");
+
+}
+
+static void
+_end_scenario (GScanner * scanner, GherkinScannerContext * ctx)
+{
+  guint i;
+
+  END_ARRAY ("Steps");
+  json_builder_set_member_name (ctx->builder, "tags");
+  BEGIN_ARRAY ("tags");
+  for (i = 0; i < ctx->scenario_tags->len; i++) {
+    GherkinTag *tag = &g_array_index (ctx->scenario_tags, GherkinTag, i);
+
+    _set_tag (scanner, ctx, tag->column, tag->line, tag->name);
+  }
+  END_ARRAY ("tags");
+
+  json_builder_set_member_name (ctx->builder, "type");
+  json_builder_add_string_value (ctx->builder, "Scenario");
+  END_OBJECT ("Scenario");
+}
 
 static void
 _maybe_end_mode (GScanner * scanner, GherkinScannerContext * ctx, guint token)
 {
-  if (token != GHERKIN_TOKEN_TABLE && ctx->mode == GHERKIN_SCANNER_MODE_TABLE) {
+  if (ctx->mode == GHERKIN_SCANNER_MODE_TAGS) {
+    END_ARRAY ("Tags");
+
+    ctx->mode = GHERKIN_SCANNER_MODE_NONE;
+  } else if (token != GHERKIN_TOKEN_TABLE && ctx->mode == GHERKIN_SCANNER_MODE_TABLE) {
     ctx->mode = GHERKIN_SCANNER_MODE_NONE;
     _end_cells (scanner, ctx);
     END_ARRAY ("Rows");
+    json_builder_set_member_name (ctx->builder, "type");
+    json_builder_add_string_value (ctx->builder, "DataTable");
     END_OBJECT ("Arguments");
     END_OBJECT ("Step");
   } else if (ctx->mode == GHERKIN_SCANNER_MODE_STEP
@@ -214,21 +268,18 @@ _parse_feature (GScanner * scanner, GherkinScannerContext * ctx)
 
   _set_current_indent (scanner, ctx);
 
-  BEGIN_OBJECT ("Feature");
-
   json_builder_set_member_name (ctx->builder, "comments"); {
     BEGIN_ARRAY ("comments");
     END_ARRAY ("comments");
   }
 
-  json_builder_set_member_name (ctx->builder, "description"); {
     if (!_peek_next_gherkin_token (scanner)) {
+      json_builder_set_member_name (ctx->builder, "description"); {
       for (i = ctx->symbol_line + 1; i < scanner->next_line + 1; i++) {
         g_string_append (description, ctx->lines[i]);
       }
+      json_builder_add_string_value (ctx->builder, g_strstrip (description->str));
     }
-
-    json_builder_add_string_value (ctx->builder, g_strstrip (description->str));
   }
 
   json_builder_set_member_name (ctx->builder, "keyword");
@@ -255,16 +306,18 @@ _parse_scenario (GScanner * scanner, GherkinScannerContext * ctx)
 {
   _maybe_end_mode (scanner, ctx, GHERKIN_TOKEN_SCENARIO);
 
-  ctx->mode = GHERKIN_SCANNER_MODE_NONE;
   if (!ctx->scenarios) {
+    ctx->scenario_tags = g_array_new (TRUE, TRUE, sizeof (GherkinTag));
+    g_array_set_clear_func (ctx->scenario_tags, (GDestroyNotify) _free_tag);
+
     json_builder_set_member_name (ctx->builder, "scenarioDefinitions");
     BEGIN_ARRAY ("scenarioDefinitions");
 
     ctx->scenarios = TRUE;
   } else {
-    END_ARRAY ("Steps");
-    END_OBJECT ("Scenario");
+    _end_scenario (scanner, ctx);
   }
+  ctx->mode = GHERKIN_SCANNER_MODE_NONE;
 
   _set_current_indent (scanner, ctx);
 
@@ -302,17 +355,24 @@ _parse_table (GScanner * scanner, GherkinScannerContext * ctx)
   if ((guint) scanner->next_token == GHERKIN_TOKEN_TABLE) {
     gchar *line = ctx->lines[scanner->line - 1];
 
-    for (i = scanner->position; line[i] != '|'; i--)
+    for (i = scanner->position - 1; line[i] != '|'; i--) {
       g_string_prepend_c (value, line[i]);
+    }
+
+    i++;
+    while (line[i] == ' ') {
+      if (scanner->line == 10)
+      i++;
+    }
   }
 
   if (ctx->mode != GHERKIN_SCANNER_MODE_TABLE) {
     ctx->mode = GHERKIN_SCANNER_MODE_TABLE;
 
-    json_builder_set_member_name (ctx->builder, "arguments");
+    json_builder_set_member_name (ctx->builder, "argument");
 
     BEGIN_OBJECT ("Arguments");
-    _set_location (scanner, ctx, -1, -1);
+    _set_location (scanner, ctx, scanner->position - 3, -1);
 
     json_builder_set_member_name (ctx->builder, "rows");
     BEGIN_ARRAY ("Rows");
@@ -330,7 +390,7 @@ _parse_table (GScanner * scanner, GherkinScannerContext * ctx)
   }
 
   BEGIN_OBJECT ("TableCell");
-  _set_location (scanner, ctx, i + 3, -1);
+  _set_location (scanner, ctx, i, -1);
   json_builder_set_member_name (ctx->builder, "type");
   json_builder_add_string_value (ctx->builder, "TableCell");
 
@@ -403,11 +463,42 @@ gherkin_scanner_parse_symbol (GScanner * scanner)
       new_symbol = TRUE;
       break;
     case GHERKIN_TOKEN_GIVEN:
-      _parse_step (scanner, ctx, "Given", (GherkinToken) scanner->token);
+      _parse_step (scanner, ctx, "Given ", (GherkinToken) scanner->token);
+      new_symbol = TRUE;
+      break;
+    case GHERKIN_TOKEN_AND:
+      _parse_step (scanner, ctx, "And ", (GherkinToken) scanner->token);
       new_symbol = TRUE;
       break;
     case GHERKIN_TOKEN_TABLE:
       _parse_table (scanner, ctx);
+      break;
+    case GHERKIN_TOKEN_TAG:
+      {
+        gint i;
+        GString *tag_str = g_string_new (NULL);
+        gchar *line = ctx->lines[scanner->line -1];
+
+        for (i = scanner->position - 1; line[i] != ' ' && line[i] != '\0'; i++)
+          g_string_append_c (tag_str, line[i]);
+
+        if (ctx->scenarios) {
+          GherkinTag tag = {scanner->line, scanner->position, tag_str->str };
+
+          g_array_append_val (ctx->scenario_tags, tag);
+        } else {
+          if (ctx->mode != GHERKIN_SCANNER_MODE_TAGS) {
+
+            json_builder_set_member_name (ctx->builder, "tags");
+            BEGIN_ARRAY ("Tags");
+            ctx->mode = GHERKIN_SCANNER_MODE_TAGS;
+          } 
+
+          _set_tag (scanner, ctx, scanner->position, scanner->line, tag_str->str);
+        }
+
+        g_string_free (tag_str, FALSE);
+      }
       break;
   }
 
@@ -418,12 +509,9 @@ gherkin_scanner_parse_symbol (GScanner * scanner)
     _maybe_end_mode (scanner, ctx, G_TOKEN_NONE);
 
     if (ctx->scenarios) {
-      END_ARRAY ("Steps");
-      END_OBJECT ("Scenario");
+      _end_scenario (scanner, ctx);
       END_ARRAY ("ScenarioDefinitionsn");
     }
-
-    END_OBJECT ("Feature");
   }
 
   return res;
@@ -434,6 +522,7 @@ gherkin_scanner_new (gchar * input_text, guint text_length)
 {
   GScanner *scanner;
   GherkinScannerContext *ctx;
+  gint i;
 
   g_return_val_if_fail (input_text, NULL);
 
@@ -453,13 +542,12 @@ gherkin_scanner_new (gchar * input_text, guint text_length)
   scanner->config->int_2_float = TRUE;
   /* don't return G_TOKEN_SYMBOL, but the symbol's value */
   scanner->config->symbol_2_token = TRUE;
+  scanner->config->case_sensitive = TRUE;
 
   /* load symbols into the scanner */
-  while (symbol_p->symbol_name) {
+  for (i = 0; symbols[i].symbol_name; i++) {
     g_scanner_scope_add_symbol (scanner, 0,
-        symbol_p->symbol_name, GINT_TO_POINTER (symbol_p->symbol_token));
-
-    symbol_p++;
+        symbols[i].symbol_name, GINT_TO_POINTER (symbols[i].symbol_token));
   }
 
   return scanner;
@@ -474,6 +562,8 @@ gherkin_scanner_parse (GScanner * scanner)
 
   g_return_val_if_fail (ctx, FALSE);
 
+  BEGIN_OBJECT ("Feature");
+
   do {
     expected_token = gherkin_scanner_parse_symbol (scanner);
 
@@ -481,6 +571,8 @@ gherkin_scanner_parse (GScanner * scanner)
   }
   while (expected_token == G_TOKEN_NONE &&
       !_is_ending_token (scanner->next_token));
+
+  END_OBJECT ("Feature");
 
   /* give an error message upon syntax errors */
   if (expected_token != G_TOKEN_NONE) {
