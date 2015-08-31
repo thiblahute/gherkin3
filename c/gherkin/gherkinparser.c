@@ -6,24 +6,6 @@
 #include "gherkinparser.h"
 #include "gherkinastbuilder.h"
 
-static gboolean debug_json = 0;
-
-#define BEGIN_OBJECT(name) G_STMT_START {\
-  if (debug_json) DEBUG ("--> begin %s (file line %d)", name, priv->scanner->line); \
-  json_builder_begin_object (priv->builder);} G_STMT_END
-
-#define END_OBJECT(name) G_STMT_START {\
-  if (debug_json) DEBUG ("<-- End %s (file line %d)", name, priv->scanner->line); \
-  json_builder_end_object (priv->builder);} G_STMT_END
-
-#define BEGIN_ARRAY(name) G_STMT_START {\
-  if (debug_json) DEBUG ("--> Begin Array: %s (file line %d)", name, priv->scanner->line); \
-  json_builder_begin_array (priv->builder);} G_STMT_END
-
-#define END_ARRAY(name) G_STMT_START {\
-  if (debug_json) DEBUG ("--> End Array: %s (file line %d)", name, priv->scanner->line); \
-  json_builder_end_array (priv->builder);} G_STMT_END
-
 typedef enum
 {
   GHERKIN_PARSER_MODE_NONE,
@@ -79,42 +61,14 @@ _set_current_indent (GherkinParser * self)
 }
 
 static void
-_set_location (GherkinParser * self, gint override_column, gint override_line)
-{
-  GherkinParserPrivate *priv = self->priv;
-  gint column = override_column < 0 ? priv->indent_level : override_column;
-  gint line = override_line < 0 ? priv->symbol_line + 1 : override_line;
-
-  json_builder_set_member_name (priv->builder, "location"); {
-    BEGIN_OBJECT ("Location"); {
-      json_builder_set_member_name (priv->builder, "column");
-      json_builder_add_int_value (priv->builder, column);
-
-      json_builder_set_member_name (priv->builder, "line");
-      json_builder_add_int_value (priv->builder, line);
-    }
-    END_OBJECT ("Location");
-  }
-}
-
-static void
 _set_tag (GherkinParser * self, gint column, guint line, gchar * name)
 {
-  GherkinParserPrivate *priv = self->priv;
   GherkinRule * tag;
 
   tag = gherkin_ast_builder_start_rule (self->priv->ast_builder, GHERKIN_RULE_TAG);
-  BEGIN_OBJECT ("Tag");
   gherkin_rule_set_location (tag, line, column);
   gherkin_rule_set_name (tag, name);
-  _set_location (self, column, line);
-  json_builder_set_member_name (priv->builder, "name");
-  json_builder_add_string_value (priv->builder, name);
-  json_builder_set_member_name (priv->builder, "type");
-  json_builder_add_string_value (priv->builder, "Tag");
-  END_OBJECT ("Tag");
   gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_TAG);
-
 }
 
 static void
@@ -122,12 +76,7 @@ _end_cells (GherkinParser * self)
 {
   GherkinParserPrivate *priv = self->priv;
 
-  END_ARRAY ("Cells");
   gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_CELLS);
-  _set_location (self, priv->last_row_column, priv->last_row_line);
-  json_builder_set_member_name (priv->builder, "type");
-  json_builder_add_string_value (priv->builder, "TableRow");
-  END_OBJECT ("Cells");
 
   priv->last_row_line = -1;
   priv->last_row_column = -1;
@@ -140,7 +89,6 @@ _maybe_end_mode (GherkinParser * self, guint token)
   GherkinParserPrivate *priv = self->priv;
 
   if (priv->mode == GHERKIN_PARSER_MODE_TAGS) {
-    END_ARRAY ("Tags");
     gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_TAGS);
 
     priv->mode = GHERKIN_PARSER_MODE_NONE;
@@ -149,16 +97,10 @@ _maybe_end_mode (GherkinParser * self, guint token)
     priv->mode = GHERKIN_PARSER_MODE_NONE;
     _end_cells (self);
     gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_ROWS);
-    END_ARRAY ("Rows");
-    json_builder_set_member_name (priv->builder, "type");
-    json_builder_add_string_value (priv->builder, "DataTable");
-    END_OBJECT ("Arguments");
     gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_ARGUMENTS);
-    END_OBJECT ("Step");
     gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_STEP);
   } else if (priv->mode == GHERKIN_PARSER_MODE_STEP
       && token != GHERKIN_TOKEN_TABLE) {
-    END_OBJECT ("Step");
     gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_STEP);
   }
 }
@@ -181,41 +123,24 @@ _parse_feature (GherkinParser * self)
   _set_current_indent (self);
 
   gherkin_ast_builder_start_rule (self->priv->ast_builder, GHERKIN_RULE_COMMENT);
-  json_builder_set_member_name (priv->builder, "comments"); {
-    BEGIN_ARRAY ("comments");
-    END_ARRAY ("comments");
-  }
   gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_COMMENT);
 
   if (!gherkin_scanner_peek_next_token (priv->scanner)) {
-    json_builder_set_member_name (priv->builder, "description"); {
-      for (i = priv->symbol_line + 1; i < priv->scanner->next_line + 1; i++) {
-        g_string_append (description, priv->lines[i]);
-      }
-      json_builder_add_string_value (priv->builder,
-          g_strstrip (description->str));
+    for (i = priv->symbol_line + 1; i < priv->scanner->next_line + 1; i++) {
+      g_string_append (description, priv->lines[i]);
     }
+
+    gherkin_feature_set_description (rule, g_strstrip (description->str));
   }
 
   gherkin_rule_set_keyword (rule, "Feature");
-  json_builder_set_member_name (priv->builder, "keyword");
-  json_builder_add_string_value (priv->builder, "Feature");
-
   gherkin_feature_set_language (rule, "en");
-  json_builder_set_member_name (priv->builder, "language");
-  json_builder_add_string_value (priv->builder, "en");  /* FIXME! */
-
   gherkin_rule_set_location (rule, priv->symbol_line, priv->indent_level);
-  _set_location (self, -1, -1);
 
-  json_builder_set_member_name (priv->builder, "name");
-  tmp =
-      g_strdup (&priv->lines[priv->symbol_line][priv->indent_level - 1 +
+  tmp = g_strdup (&priv->lines[priv->symbol_line][priv->indent_level - 1 +
           strlen ("Feature:")]);
   gherkin_rule_set_name (rule, g_strstrip (tmp));
-  json_builder_add_string_value (priv->builder, g_strstrip (tmp));
   g_free (tmp);
-
 
   return G_TOKEN_NONE;
 }
@@ -227,9 +152,6 @@ _end_scenario (GherkinParser * self)
   GherkinParserPrivate *priv = self->priv;
 
   gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_STEPS);
-  END_ARRAY ("Steps");
-  json_builder_set_member_name (priv->builder, "tags");
-  BEGIN_ARRAY ("tags");
   gherkin_ast_builder_start_rule (self->priv->ast_builder, GHERKIN_RULE_TAGS);
   for (i = 0; i < priv->scenario_tags->len; i++) {
     GherkinRule *tag = &g_array_index (priv->scenario_tags, GherkinRule, i);
@@ -237,13 +159,7 @@ _end_scenario (GherkinParser * self)
     _set_tag (self, GHERKIN_RULE_COLUMN(tag), GHERKIN_RULE_LINE (tag),
         GHERKIN_RULE_NAME (tag));
   }
-  END_ARRAY ("tags");
   gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_TAGS);
-
-  json_builder_set_member_name (priv->builder, "type");
-  json_builder_add_string_value (priv->builder, "Scenario");
-  END_OBJECT ("Scenario");
-
   gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_SCENARIO);
 }
 
@@ -258,9 +174,7 @@ _parse_scenario (GherkinParser * self)
   if (!priv->scenarios) {
     priv->scenario_tags = g_array_new (TRUE, TRUE, sizeof (GherkinRule));
 
-    json_builder_set_member_name (priv->builder, "scenarioDefinitions");
     gherkin_ast_builder_start_rule (self->priv->ast_builder, GHERKIN_RULE_SCENARIO_DEFINITIONS);
-    BEGIN_ARRAY ("scenarioDefinitions");
 
     priv->scenarios = TRUE;
   } else {
@@ -272,22 +186,12 @@ _parse_scenario (GherkinParser * self)
 
   scenario = gherkin_ast_builder_start_rule (self->priv->ast_builder, GHERKIN_RULE_SCENARIO);
   gherkin_rule_set_keyword (scenario, "Scenario");
-  BEGIN_OBJECT ("Scenario");
-  json_builder_set_member_name (priv->builder, "keyword");
-  json_builder_add_string_value (priv->builder, "Scenario");
 
   gherkin_rule_set_location (scenario, priv->symbol_line, priv->indent_level);
-  _set_location (self, -1, -1);
-
-  json_builder_set_member_name (priv->builder, "name");
-  json_builder_add_string_value (priv->builder,
-      &priv->lines[priv->symbol_line][priv->indent_level - 1 + strlen ("Scenario:")]);
   gherkin_rule_set_name (scenario,
       &priv->lines[priv->symbol_line][priv->indent_level - 1 + strlen ("Scenario:")]);
 
   gherkin_ast_builder_start_rule (self->priv->ast_builder, GHERKIN_RULE_STEPS);
-  json_builder_set_member_name (priv->builder, "steps");
-  BEGIN_ARRAY ("Steps");
 
   return G_TOKEN_NONE;
 }
@@ -324,15 +228,10 @@ _parse_table (GherkinParser * self)
   if (priv->mode != GHERKIN_PARSER_MODE_TABLE) {
     priv->mode = GHERKIN_PARSER_MODE_TABLE;
 
-    json_builder_set_member_name (priv->builder, "argument");
 
-    BEGIN_OBJECT ("Arguments");
     args = gherkin_ast_builder_start_rule (self->priv->ast_builder, GHERKIN_RULE_ARGUMENTS);
     gherkin_rule_set_location (args, priv->symbol_line, priv->scanner->position - 3);
-    _set_location (self, priv->scanner->position - 3, -1);
 
-    json_builder_set_member_name (priv->builder, "rows");
-    BEGIN_ARRAY ("Rows");
     gherkin_ast_builder_start_rule (self->priv->ast_builder, GHERKIN_RULE_ROWS);
   }
 
@@ -340,26 +239,16 @@ _parse_table (GherkinParser * self)
     if (priv->last_row_line > 0)
       _end_cells (self);
 
-    BEGIN_OBJECT ("Cells");
     gherkin_ast_builder_start_rule (self->priv->ast_builder, GHERKIN_RULE_CELLS);
-    json_builder_set_member_name (priv->builder, "cells");
-    BEGIN_ARRAY ("Cells");
     priv->last_row_line = priv->scanner->line;
     priv->last_row_column = i + 1;
   }
 
   cell = gherkin_ast_builder_start_rule (self->priv->ast_builder, GHERKIN_RULE_CELL);
-  BEGIN_OBJECT ("TableCell");
-  gherkin_rule_set_location (args, priv->symbol_line, i);
-  _set_location (self, i, -1);
-  json_builder_set_member_name (priv->builder, "type");
-  json_builder_add_string_value (priv->builder, "TableCell");
+  gherkin_rule_set_location (cell, priv->symbol_line, i);
 
   gherkin_cell_set_value (cell, g_strstrip (value->str));
-  json_builder_set_member_name (priv->builder, "value");
-  json_builder_add_string_value (priv->builder, g_strstrip (value->str));
   gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_CELL);
-  END_OBJECT ("TableCell");
 
   g_string_free (value, TRUE);
 
@@ -381,24 +270,16 @@ _parse_step (GherkinParser * self, const gchar * step_name, GherkinToken token)
   _set_current_indent (self);
 
   step = gherkin_ast_builder_start_rule (self->priv->ast_builder, GHERKIN_RULE_STEP);
-  BEGIN_OBJECT ("Step");
 
   gherkin_rule_set_keyword (step, "step_name");
-  json_builder_set_member_name (priv->builder, "keyword");
-  json_builder_add_string_value (priv->builder, step_name);
 
   gherkin_rule_set_location (step, priv->symbol_line, priv->indent_level);
-  _set_location (self, -1, -1);
 
-  json_builder_set_member_name (priv->builder, "text");
   tmp =
       g_strdup (&priv->lines[priv->symbol_line][priv->indent_level - 1 +
           strlen (step_name)]);
-  json_builder_add_string_value (priv->builder, g_strstrip (tmp));
   gherkin_step_set_text (step, g_strstrip (tmp));
 
-  json_builder_set_member_name (priv->builder, "type");
-  json_builder_add_string_value (priv->builder, "Step");
 
   priv->mode = GHERKIN_PARSER_MODE_STEP;
 
@@ -455,8 +336,6 @@ _parse_token (GherkinParser * self, GherkinToken token)
       } else {
         if (priv->mode != GHERKIN_PARSER_MODE_TAGS) {
 
-          json_builder_set_member_name (priv->builder, "tags");
-          BEGIN_ARRAY ("Tags");
           priv->mode = GHERKIN_PARSER_MODE_TAGS;
         }
 
@@ -482,7 +361,6 @@ gherkin_parser_parse (GherkinParser * self)
   GherkinToken token;
   GherkinParserPrivate *priv = self->priv;
 
-  BEGIN_OBJECT ("Feature");
   do {
 
     token = gherkin_scanner_next_token (self->priv->scanner);
@@ -497,11 +375,8 @@ gherkin_parser_parse (GherkinParser * self)
 
   if (priv->scenarios) {
     _end_scenario (self);
-    END_ARRAY ("scenarioDefinitions");
     gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_SCENARIO_DEFINITIONS);
   }
-
-  END_OBJECT ("Feature");
 
   gherkin_ast_builder_end_rule (self->priv->ast_builder, GHERKIN_RULE_FEATURE);
   gherkin_ast_builder_dump_ast (priv->ast_builder);
@@ -525,14 +400,6 @@ gherkin_parser_new (GScanner * scanner)
   return self;
 }
 
-JsonNode *
-gherkin_parser_get_ast (GherkinParser * self)
-{
-  GherkinParserPrivate *priv = self->priv;
-
-  return json_builder_get_root (priv->builder);
-}
-
 /*  GObject vmethods implementation */
 static void
 _finalize (GObject * object)
@@ -554,7 +421,6 @@ gherkin_parser_init (GherkinParser * self)
   self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, GHERKIN_TYPE_PARSER,
       GherkinParserPrivate);
 
-  self->priv->builder = json_builder_new ();
   self->priv->last_row_line = -1;
   self->priv->last_row_column = -1;
 
