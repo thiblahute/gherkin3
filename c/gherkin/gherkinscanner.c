@@ -89,8 +89,8 @@ gherkin_scanner_new (gchar * input_text, guint text_length,
 gboolean
 gherkin_is_scanner (GScanner *scanner)
 {
-  return (gboolean) g_datalist_get_data (&scanner->qdata,
-      "GherkinScanner");
+  return GPOINTER_TO_INT(g_datalist_get_data (&scanner->qdata,
+      "GherkinScanner"));
 }
 
 gboolean

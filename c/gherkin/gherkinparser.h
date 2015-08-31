@@ -1,5 +1,5 @@
-#ifndef __GHERKIN3PARSER_H__
-#define __GHERKIN3PARSER_H__
+#ifndef __GHERKINPARSER_H__
+#define __GHERKINPARSER_H__
 
 #include <glib.h>
 #include <glib-object.h>
@@ -19,4 +19,4 @@ JsonNode *      gherkin_parser_get_ast (GherkinParser * self);
 
 G_END_DECLS
 
-#endif /* __GHERKIN3PARSER_H__ */ 
+#endif /* __GHERKINPARSER_H__ */ 

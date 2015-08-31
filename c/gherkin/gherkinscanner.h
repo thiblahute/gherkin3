@@ -5,19 +5,9 @@
 #include <json-glib/json-glib.h>
 #include <json-glib/json-gobject.h>
 
-G_BEGIN_DECLS
+#include "gherkintypes.h"
 
-typedef enum {
-  GHERKIN_TOKEN_SCENARIO = G_TOKEN_LAST + 1,
-  GHERKIN_TOKEN_FEATURE = G_TOKEN_LAST + 2,
-  GHERKIN_TOKEN_GIVEN = G_TOKEN_LAST + 3,
-  GHERKIN_TOKEN_WHEN = G_TOKEN_LAST + 4,
-  GHERKIN_TOKEN_THEN = G_TOKEN_LAST + 5,
-  GHERKIN_TOKEN_TABLE = '|',
-  GHERKIN_TOKEN_TAG = '@',
-  GHERKIN_TOKEN_AND = G_TOKEN_LAST + 6,
-  GHERKIN_TOKEN_EOF = G_TOKEN_EOF
-} GherkinToken;
+G_BEGIN_DECLS
 
 GScanner * gherkin_scanner_new             (gchar * input_text,
                                             guint text_length,
