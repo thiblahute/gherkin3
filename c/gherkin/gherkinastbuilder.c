@@ -30,10 +30,11 @@ _print_stack (GNode *node, gpointer unused)
   g_print ("%*s%s '%p:%s' (parent: %p:%s) (depth %d)\n",
       (g_node_depth (node) -1) * 4, "", 
       gherkin_rule_type_get_name (GHERKIN_RULE_TYPE (rule)),
-      rule, GHERKIN_RULE_NAME (rule) ? GHERKIN_RULE_NAME (rule) : "No name",
+      (gpointer) rule, GHERKIN_RULE_NAME (rule) ? GHERKIN_RULE_NAME (rule) : "No name",
       node->parent ? node->parent->data : "",
       node->parent ? gherkin_rule_type_get_name (GHERKIN_RULE_TYPE (node->parent->data)) :
       "None", g_node_depth (node));
+
   return FALSE;
 }
 
@@ -42,11 +43,6 @@ gherkin_ast_builder_dump_ast (GherkinAstBuilder *self)
 {
   g_node_traverse (self->priv->stack.head->data,
       G_PRE_ORDER, G_TRAVERSE_ALL, -1, _print_stack, NULL);
-}
-
-static GNode * _current_node (GherkinAstBuilder *self)
-{
-  return self->priv->stack.head ? self->priv->stack.head->data : NULL;
 }
 
 GherkinRule * 

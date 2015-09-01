@@ -289,16 +289,15 @@ _parse_step (GherkinParser * self, const gchar * step_name, GherkinToken token)
 static gboolean
 _parse_token (GherkinParser * self, GherkinToken token)
 {
-  guint res = G_TOKEN_NONE;
   GherkinParserPrivate *priv = self->priv;
 
   priv->symbol_line = priv->scanner->line - 1;
   switch (token) {
     case GHERKIN_TOKEN_FEATURE:
-      res = _parse_feature (self);
+      _parse_feature (self);
       break;
     case GHERKIN_TOKEN_SCENARIO:
-      res = _parse_scenario (self);
+      _parse_scenario (self);
       break;
     case GHERKIN_TOKEN_WHEN:
       _parse_step (self, "When", token);
@@ -412,7 +411,9 @@ _finalize (GObject * object)
 static void
 gherkin_parser_class_init (GherkinParserClass * klass)
 {
-  return;
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->finalize = _finalize;
 }
 
 static void
