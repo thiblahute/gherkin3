@@ -1,7 +1,6 @@
 project('gherkin', 'c')
 
 add_global_arguments('-Wno-variadic-macros', language : 'c')
-add_global_arguments('-Wno-gnu-zero-variadic-macro-arguments', language : 'c')
 
 apiversion = '0.1'
 gherkin_major = 0
@@ -16,6 +15,7 @@ json_glib_dep = dependency('json-glib-1.0')
 
 inc_dirs = include_directories('gherkin/')
 
+mono = find_program('mono')
 gir = find_program('g-ir-scanner', required : false)
 build_gir = gir.found() and not meson.is_cross_build() and not get_option('disable-introspection')
 gnome = import('gnome')

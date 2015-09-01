@@ -64,10 +64,10 @@ _set_tag (GherkinParser * self, gint column, guint line, gchar * name)
 {
   GherkinRule * tag;
 
-  tag = gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_TAG);
+  tag = gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE__TagLine);
   gherkin_rule_set_location (tag, line, column);
   gherkin_rule_set_name (tag, name);
-  gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_TAG);
+  gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE__TagLine);
 }
 
 static void
@@ -75,7 +75,7 @@ _end_cells (GherkinParser * self)
 {
   GherkinParserPrivate *priv = self->priv;
 
-  gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_CELLS);
+  gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE__TableRow);
 
   priv->last_row_line = -1;
   priv->last_row_column = -1;
@@ -88,19 +88,19 @@ _maybe_end_mode (GherkinParser * self, guint token)
   GherkinParserPrivate *priv = self->priv;
 
   if (priv->mode == GHERKIN_PARSER_MODE_TAGS) {
-    gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_TAGS);
+    gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_Tags);
 
     priv->mode = GHERKIN_PARSER_MODE_NONE;
   } else if (token != GHERKIN_TOKEN_TableRow
       && priv->mode == GHERKIN_PARSER_MODE_TABLE) {
     priv->mode = GHERKIN_PARSER_MODE_NONE;
     _end_cells (self);
-    gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_ROWS);
-    gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_ARGUMENTS);
-    gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_STEP);
+    gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_DataTable);
+    gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_Step_Arg);
+    gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_Step);
   } else if (priv->mode == GHERKIN_PARSER_MODE_STEP
       && token != GHERKIN_TOKEN_TableRow) {
-    gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_STEP);
+    gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_Step);
   }
 }
 
@@ -120,8 +120,8 @@ _parse_feature (GherkinParser * self)
 
   _set_current_indent (self);
 
-  gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_COMMENTS);
-  gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_COMMENTS);
+  gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_TOKEN_Comment);
+  gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_TOKEN_Comment);
 
   if (GHERKIN_IS_AST_BUILDER (priv->formatter)) {
     rule = gherkin_ast_builder_get_root (GHERKIN_AST_BUILDER (priv->formatter))->data;
@@ -152,16 +152,16 @@ _end_scenario (GherkinParser * self)
   guint i;
   GherkinParserPrivate *priv = self->priv;
 
-  gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_STEPS);
-  gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_TAGS);
+  gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_Step);
+  gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_Tags);
   for (i = 0; i < priv->scenario_tags->len; i++) {
     GherkinRule *tag = &g_array_index (priv->scenario_tags, GherkinRule, i);
 
     _set_tag (self, GHERKIN_RULE_COLUMN(tag), GHERKIN_RULE_LINE (tag),
         GHERKIN_RULE_NAME (tag));
   }
-  gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_TAGS);
-  gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_SCENARIO);
+  gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_Tags);
+  gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_Scenario);
 }
 
 static guint
@@ -175,7 +175,7 @@ _parse_scenario (GherkinParser * self)
   if (!priv->scenarios) {
     priv->scenario_tags = g_array_new (TRUE, TRUE, sizeof (GherkinRule));
 
-    gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_SCENARIO_DEFINITIONS);
+    gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_Scenario_Definition);
 
     priv->scenarios = TRUE;
   } else {
@@ -185,13 +185,13 @@ _parse_scenario (GherkinParser * self)
 
   _set_current_indent (self);
 
-  scenario = gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_SCENARIO);
+  scenario = gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_Scenario);
   gherkin_rule_set_keyword (scenario, "Scenario");
   gherkin_rule_set_location (scenario, priv->symbol_line, priv->indent_level);
   gherkin_rule_set_name (scenario,
       &priv->lines[priv->symbol_line][priv->indent_level - 1 + strlen ("Scenario:")]);
 
-  gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_STEPS);
+  gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_Step);
 
   return TRUE;
 }
@@ -227,16 +227,16 @@ _parse_table (GherkinParser * self)
   if (priv->mode != GHERKIN_PARSER_MODE_TABLE) {
     priv->mode = GHERKIN_PARSER_MODE_TABLE;
 
-    args = gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_ARGUMENTS);
+    args = gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_Step_Arg);
     gherkin_rule_set_location (args, priv->symbol_line, priv->scanner->position - 3);
-    gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_ROWS);
+    gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_DataTable);
   }
 
   if ((guint) priv->last_row_line != priv->scanner->line) {
     if (priv->last_row_line > 0)
       _end_cells (self);
 
-    gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_CELLS);
+    gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE__TableRow);
     priv->last_row_line = priv->scanner->line;
     priv->last_row_column = i + 1;
   }
@@ -275,7 +275,7 @@ _parse_step (GherkinParser * self, GherkinToken token)
 
   tmp = g_strdup (&priv->lines[priv->symbol_line][priv->indent_level - 1 +
           strlen (step_name->str)]);
-  step = gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_STEP);
+  step = gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_Step);
   gherkin_rule_set_keyword (step, step_name->str);
   gherkin_rule_set_location (step, priv->symbol_line, priv->indent_level);
   gherkin_step_set_text (step, g_strstrip (tmp));
@@ -324,7 +324,7 @@ _parse_token (GherkinParser * self, GherkinToken token)
         g_array_append_val (priv->scenario_tags, tag);
       } else {
         if (priv->mode != GHERKIN_PARSER_MODE_TAGS) {
-          gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_TAGS);
+          gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_Tags);
           priv->mode = GHERKIN_PARSER_MODE_TAGS;
         }
 
@@ -336,6 +336,9 @@ _parse_token (GherkinParser * self, GherkinToken token)
     }
       break;
     case GHERKIN_TOKEN_EOF:
+      break;
+    default:
+      DEBUG(PARSER, "Implement me: %s", gherkin_token_get_name (token));
       break;
   }
 
@@ -350,7 +353,7 @@ gherkin_parser_parse (GherkinParser * self)
   GherkinToken token;
   GherkinParserPrivate *priv = self->priv;
 
-  gherkin_formatter_start_rule (priv->formatter, GHERKIN_RULE_FEATURE);
+  gherkin_formatter_start_rule (priv->formatter, GHERKIN_RULE_Feature);
   do {
 
     token = gherkin_scanner_next_token (self->priv->scanner);
@@ -368,7 +371,7 @@ gherkin_parser_parse (GherkinParser * self)
 
   if (priv->scenarios) {
     _end_scenario (self);
-    gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_SCENARIO_DEFINITIONS);
+    gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_Scenario_Definition);
   }
 
   gherkin_formatter_serialize_results (priv->formatter);

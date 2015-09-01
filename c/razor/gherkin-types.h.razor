@@ -1,0 +1,35 @@
+@using Berp;
+#ifndef __GHERKINATYPESGENERATED_H__
+#define __GHERKINATYPESGENERATED_H__
+#include <glib.h>
+
+typedef enum {
+    GHERKIN_RULE_CELL,
+    @foreach(var rule in Model.RuleSet.Where(r => !r.TempRule))
+    {<text>  GHERKIN_RULE_@rule.Name.Replace("#", "_"),  /* @rule.ToString(true) */
+</text>}
+} GherkinRuleType;
+
+
+typedef enum {
+  GHERKIN_TOKEN_EOF = G_TOKEN_EOF,
+  GHERKIN_TOKEN_Empty = G_TOKEN_LAST + 1,
+  GHERKIN_TOKEN_Comment = G_TOKEN_LAST + 2,
+  GHERKIN_TOKEN_TagLine = G_TOKEN_LAST + 3,
+  GHERKIN_TOKEN_FeatureLine = G_TOKEN_LAST + 4,
+  GHERKIN_TOKEN_BackgroundLine = G_TOKEN_LAST + 5,
+  GHERKIN_TOKEN_ScenarioLine = G_TOKEN_LAST + 6,
+  GHERKIN_TOKEN_ScenarioOutlineLine = G_TOKEN_LAST + 7,
+  GHERKIN_TOKEN_ExamplesLine = G_TOKEN_LAST + 8,
+  GHERKIN_TOKEN_StepLine = G_TOKEN_LAST + 9,
+  GHERKIN_TOKEN_DocStringSeparator = G_TOKEN_LAST + 10,
+  GHERKIN_TOKEN_TableRow = G_TOKEN_LAST + 11,
+  GHERKIN_TOKEN_Language = G_TOKEN_LAST + 12,
+  GHERKIN_TOKEN_Other = G_TOKEN_LAST + 13,
+  GHERKIN_TOKEN_CELL = G_TOKEN_LAST + 14,
+} GherkinToken;
+
+const gchar * gherkin_token_get_name (GherkinToken token);
+const gchar * gherkin_rule_type_get_name (GherkinRuleType rule_type);
+
+#endif /* __GHERKINATYPESGENERATED_H__ */ 

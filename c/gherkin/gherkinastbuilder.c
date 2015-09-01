@@ -39,7 +39,7 @@ _print_stack (GNode * node, gpointer unused)
   if (GHERKIN_RULE_KEYWORD (rule))
     g_print (" | Keyword '%s'", GHERKIN_RULE_KEYWORD (rule));
 
-  if (GHERKIN_RULE_TYPE (rule) == GHERKIN_RULE_STEP)
+  if (GHERKIN_RULE_TYPE (rule) == GHERKIN_RULE_Step)
     g_print (" %s ", GHERKIN_STEP_TEXT (rule));
   else if (GHERKIN_RULE_TYPE (rule) == GHERKIN_RULE_CELL)
     g_print (" |Value: '%s' ", GHERKIN_CELL_VALUE (rule));
@@ -100,7 +100,7 @@ gherkin_ast_builder_init (GherkinAstBuilder * self)
   g_queue_init (&priv (self)->stack);
 
   g_queue_push_head (&priv (self)->stack,
-      g_node_new (gherkin_rule_new (GHERKIN_RULE_FEATURE)));
+      g_node_new (gherkin_rule_new (GHERKIN_RULE_Feature)));
 }
 
 static void

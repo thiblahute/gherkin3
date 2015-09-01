@@ -1,55 +1,10 @@
 #ifndef __GHERKINATYPES_H__
 #define __GHERKINATYPES_H__
 
+#include "gherkintypes.generated.h"
 #include <glib.h>
 
 G_BEGIN_DECLS
-
-typedef enum {
-  GHERKIN_TOKEN_ScenarioLine = G_TOKEN_LAST + 1,
-  GHERKIN_TOKEN_FeatureLine = G_TOKEN_LAST + 2,
-  GHERKIN_TOKEN_StepLine = G_TOKEN_LAST + 3,
-  GHERKIN_TOKEN_TableRow = '|',
-  GHERKIN_TOKEN_TagLine = '@',
-  GHERKIN_TOKEN_Language = G_TOKEN_LAST + 4,
-  GHERKIN_TOKEN_EOF = G_TOKEN_EOF
-} GherkinToken;
-
-/* 
- *   GHERKIN_TOKEN_EOF = G_TOKEN_LAST + i,
- *   GHERKIN_TOKEN_Empty = G_TOKEN_LAST + i,
- *   GHERKIN_TOKEN_Comment = G_TOKEN_LAST + i,
- *   GHERKIN_TOKEN_TagLine = G_TOKEN_LAST + i,
- *   GHERKIN_TOKEN_FeatureLine = G_TOKEN_LAST + i,
- *   GHERKIN_TOKEN_BackgroundLine = G_TOKEN_LAST + i,
- *   GHERKIN_TOKEN_ScenarioLine = G_TOKEN_LAST + i,
- *   GHERKIN_TOKEN_ScenarioOutlineLine = G_TOKEN_LAST + i,
- *   GHERKIN_TOKEN_ExamplesLine = G_TOKEN_LAST + i,
- *   GHERKIN_TOKEN_StepLine = G_TOKEN_LAST + i,
- *   GHERKIN_TOKEN_DocStringSeparator = G_TOKEN_LAST + i,
- *   GHERKIN_TOKEN_TableRow = G_TOKEN_LAST + i,
- *   GHERKIN_TOKEN_Language = G_TOKEN_LAST + i,
- *   GHERKIN_TOKEN_Other = G_TOKEN_LAST + i,
- * 
- */
-
-typedef enum {
-  GHERKIN_RULE_FEATURE,
-  GHERKIN_RULE_SCENARIO,
-  GHERKIN_RULE_TAG,
-  GHERKIN_RULE_TAGS,
-  GHERKIN_RULE_STEP,
-  GHERKIN_RULE_STEPS,
-  GHERKIN_RULE_COMMENTS,
-  GHERKIN_RULE_SCENARIO_DEFINITIONS,
-  GHERKIN_RULE_ARGUMENTS,
-  GHERKIN_RULE_TABLE,
-  GHERKIN_RULE_ROWS,
-  GHERKIN_RULE_CELLS,
-  GHERKIN_RULE_CELL,
-} GherkinRuleType;
-
-const gchar * gherkin_rule_type_get_name (GherkinRuleType rule_type);
 
 #define GHERKIN_RULE_TYPE(rule)     (((GherkinRuleCommon*) (rule))->rule_type)
 #define GHERKIN_RULE_KEYWORD(rule)  (((GherkinRuleCommon*) (rule))->keyword)

@@ -21,8 +21,8 @@ static const GherkinSymbols symbols[] = {{
   "Then", GHERKIN_TOKEN_StepLine,}, {
   "|", GHERKIN_TOKEN_TableRow,}, {
   "And", GHERKIN_TOKEN_StepLine,}, {
-  "@", GHERKIN_TOKEN_TagLine,},
-  {"#language:" GHERKIN_TOKEN_Language,},
+  "@", GHERKIN_TOKEN_TagLine,}, {
+  "#language:", GHERKIN_TOKEN_Language,},
   {NULL, 0,},
 };
 

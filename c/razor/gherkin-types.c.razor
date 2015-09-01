@@ -1,0 +1,32 @@
+@using Berp;
+#include <glib.h>
+#include "gherkintypes.generated.h"
+
+const gchar *
+gherkin_rule_type_get_name (GherkinRuleType rule_type)
+{
+    switch (rule_type) {
+    @foreach(var rule in Model.RuleSet.Where(r => !r.TempRule))
+    {<text>      case GHERKIN_RULE_@rule.Name.Replace("#", "_"):
+            return "@rule.Name";
+    </text>}
+      case GHERKIN_RULE_CELL:
+        return "Cell";
+  }
+  return NULL;
+}
+
+const gchar *
+gherkin_token_get_name (GherkinToken token)
+{
+  switch (token) {
+    @foreach(var token in Model.RuleSet.TokenRules)
+    {<text>      case GHERKIN_TOKEN_@token.Name.Replace("#", ""):
+      return "@token.Name";
+      </text>}
+    case GHERKIN_TOKEN_CELL:
+    return "Cell";
+  }
+
+  return NULL;
+}

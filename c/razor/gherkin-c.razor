@@ -1,0 +1,170 @@
+@using Berp;
+@helper CallProduction(ProductionRule production)
+{
+  switch(production.Type)
+  {
+    case ProductionRuleType.Start:
+      @:          gherkin_ast_builder_start_rule (self->priv->formatter, GHERKIN_RULE_@production.RuleName)
+      break;
+    case ProductionRuleType.End:
+      @:          gherkin_ast_builder_end_rule (self->priv->formatter, GHERKIN_RULE_@production.RuleName)
+      break;
+    case ProductionRuleType.Process:
+      @:          gherkin_ast_builder_end_rule(self->priv->formatter, token)
+      break;
+  }
+}
+@helper HandleParserError(IEnumerable<string> expectedTokens, State state)
+{<text>DEBUG(PARSER, "State: @state.Id - @Raw(state.Comment)");
+        {
+          static gchar * expected_tokens = "@Raw(string.Join(", ", expectedTokens))";
+          gherkin_parser_add_error(self,
+              g_strdup_printf ("(%d:0): unexpected end of file, expected: %s", self->scanner->line,
+                expected_tokens);
+          return @state.Id
+        }</text>
+}
+
+@helper MatchToken(TokenType tokenType)
+{<text>match_@(tokenType)(context, token)</text>}
+/* This file is generated. Do not edit! Edit gherkin-python.razor instead. */
+#include <string.h>
+#include <glib/gstdio.h>
+
+#include "gherkintypes.h"
+#include "gherkindebug.h"
+#include "gherkinscanner.h"
+#include "gherkinparser.h"
+#include "gherkinformatter.h"
+
+typedef struct
+{
+  GherkinFormatter *formatter;
+
+  GList *errors;
+
+} GherkinParserPrivate;
+
+struct _GherkinParser
+{
+  GherkinFormatter parent;
+  GherkinParserPrivate *priv;
+};
+
+
+/*  *INDENT-OFF* */
+G_DEFINE_TYPE_WITH_PRIVATE (GherkinParser, gherkin_parser, G_TYPE_OBJECT)
+/*  *INDENT-ON* */
+
+typedef struct
+{
+  guint state;
+  GCallback func;
+
+} GherkinParserStateMap;
+
+static void
+gherkin_parser_add_error(GherkinParser *self, gchar * error)
+{
+  self->priv->errors = g_list_append (self->priv->errors, error);
+}
+
+@foreach(var state in Model.States.Values.Where(s => !s.IsEndState))
+{<text>
+/* @Raw(state.Comment) */
+static guint
+match_token_at_@(state.Id)(GherkinParser *self, guint token)
+{
+  @foreach(var transition in state.Transitions)
+  {
+    @:if (token == GHERKIN_TOKEN_@transition.TokenType) {
+      if (transition.LookAheadHint != null)
+    {
+      @:if gherkin_parser_look_ahead_at_@(transition.LookAheadHint.Id)(self, token)
+    }
+    foreach(var production in transition.Productions)
+    {
+      @CallProduction(production)
+    }
+        @:return @transition.TargetState }
+    }
+  }
+
+  @HandleParserError(state.Transitions.Select(t => "#" + t.TokenType.ToString()).Distinct(), state)
+}
+</text>
+}
+
+static guint
+gherkin_parser_match_token (self, state, token)
+{
+  static GherkinParserStateMap state_map[] = {
+    @foreach(var state in Model.States.Values.Where(s => !s.IsEndState))
+    {
+      @:{@state.Id, gherkin_parser_match_token_at_@(state.Id)},
+    }
+  }
+}
+
+gboolean
+gherkin_parser_parse (GherkinParser * self)
+{
+  GherkinToken token;
+  GherkinParserPrivate *priv = self->priv;
+
+  gherkin_formatter_start_rule (priv->formatter, GHERKIN_RULE_Feature);
+  while (TRUE) {
+    token = gherkin_scanner_next_token (self->priv->scanner);
+    state = gherkin_parser_match_token (self, state, token)
+
+    if (gherkin_scanner_is_ending_token (token))
+      break;
+  }
+}
+
+/*  GObject vmethods implementation */
+static void
+_finalize (GObject * object)
+{
+  GherkinParserPrivate *priv = GHERKIN_PARSER (object)->priv;
+
+  g_strfreev (priv->lines);
+}
+
+static void
+gherkin_parser_class_init (GherkinParserClass * klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->finalize = _finalize;
+}
+
+static void
+gherkin_parser_init (GherkinParser * self)
+{
+  self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, GHERKIN_TYPE_PARSER,
+      GherkinParserPrivate);
+
+  return;
+}
+
+GherkinParser *
+gherkin_parser_new (GScanner * scanner, GherkinFormatter *formatter)
+{
+  GherkinParser *self;
+
+  g_return_val_if_fail (gherkin_is_scanner (scanner), NULL);
+  g_return_val_if_fail (scanner->line == 1, NULL);
+
+  self = g_object_new (GHERKIN_TYPE_PARSER, NULL);
+
+  self->priv->scanner = scanner;
+  self->priv->lines = g_strsplit (scanner->text, "\n", -1);
+
+  if (!formatter)
+    self->priv->formatter = GHERKIN_FORMATTER (gherkin_ast_builder_new ());
+  else
+    self->priv->formatter = GHERKIN_FORMATTER (formatter);
+
+  return self;
+}
