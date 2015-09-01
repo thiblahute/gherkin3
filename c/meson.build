@@ -1,5 +1,8 @@
 project('gherkin', 'c')
 
+add_global_arguments('-Wno-variadic-macros', language : 'c')
+add_global_arguments('-Wno-gnu-zero-variadic-macro-arguments', language : 'c')
+
 apiversion = '0.1'
 gherkin_major = 0
 gherkin_minor = 0

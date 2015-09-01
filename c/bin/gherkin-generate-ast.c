@@ -1,6 +1,8 @@
 #include <glib.h>
-#include <gherkinscanner.h>
-#include <gherkinparser.h>
+#include "../gherkin/gherkinscanner.h"
+#include "../gherkin/gherkinscanner.h"
+#include "../gherkin/gherkinparser.h"
+#include "../gherkin/gherkintokenformatter.h"
 
 #include <json-glib/json-glib.h>
 #include <json-glib/json-gobject.h>
@@ -12,6 +14,7 @@ main (int argc, char *argv[])
   gchar *content;
   GScanner *scanner;
   GherkinParser *parser;
+  GherkinFormatter *formatter;
 
   GError *err = NULL;
 
@@ -24,7 +27,7 @@ main (int argc, char *argv[])
     return 1;
   }
 
-  parser = gherkin_parser_new (scanner);
+  parser = gherkin_parser_new (scanner, NULL);
   if (!gherkin_parser_parse (parser)) {
     g_printerr ("Could not parser %s", argv[1]);
 

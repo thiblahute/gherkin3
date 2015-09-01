@@ -16,8 +16,8 @@ gherkin_rule_type_get_name (GherkinRuleType rule_type)
       return "Tags";
     case GHERKIN_RULE_STEP:
       return "Step";
-    case GHERKIN_RULE_COMMENT:
-      return "Comment";
+    case GHERKIN_RULE_COMMENTS:
+      return "Comments";
     case GHERKIN_RULE_STEPS:
       return "Steps";
     case GHERKIN_RULE_ARGUMENTS:

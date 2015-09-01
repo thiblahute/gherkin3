@@ -1,5 +1,12 @@
-gherkin_sources = ['gherkinscanner.c', 'gherkinparser.c', 'gherkinastbuilder.c', 'gherkintypes.c']
-gherkin_headers = ['gherkinscanner.h', 'gherkinparser.h', 'gherkinastbuilder.h', 'gherkintypes.h']
+gherkin_sources = ['gherkinscanner.c', 'gherkinparser.c',
+                   'gherkinastbuilder.c', 'gherkintypes.c',
+                   'gherkinformatter.c', 'gherkintokenformatter.c',
+                   'gherkindebug.c']
+
+gherkin_headers = ['gherkinscanner.h', 'gherkinparser.h',
+                   'gherkinastbuilder.h', 'gherkintypes.h',
+                   'gherkinformatter.h', 'gherkintokenformatter.h',
+                   'gherkindebug.h']
 
 gherkin = shared_library('gherkin-@0@'.format(apiversion),
     gherkin_sources,
