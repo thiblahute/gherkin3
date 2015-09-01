@@ -23,7 +23,6 @@ typedef struct
   gint symbol_line;
 
   gchar **lines;
-  JsonBuilder *builder;
 
   gboolean scenarios;
   GherkinParserMode mode;
@@ -92,7 +91,7 @@ _maybe_end_mode (GherkinParser * self, guint token)
     gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_TAGS);
 
     priv->mode = GHERKIN_PARSER_MODE_NONE;
-  } else if (token != GHERKIN_TOKEN_TABLE
+  } else if (token != GHERKIN_TOKEN_TableRow
       && priv->mode == GHERKIN_PARSER_MODE_TABLE) {
     priv->mode = GHERKIN_PARSER_MODE_NONE;
     _end_cells (self);
@@ -100,7 +99,7 @@ _maybe_end_mode (GherkinParser * self, guint token)
     gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_ARGUMENTS);
     gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_STEP);
   } else if (priv->mode == GHERKIN_PARSER_MODE_STEP
-      && token != GHERKIN_TOKEN_TABLE) {
+      && token != GHERKIN_TOKEN_TableRow) {
     gherkin_formatter_end_rule (self->priv->formatter, GHERKIN_RULE_STEP);
   }
 }
@@ -114,7 +113,7 @@ _parse_feature (GherkinParser * self)
   GherkinParserPrivate *priv = self->priv;
   GString *description = g_string_new (NULL);
 
-  _maybe_end_mode (self, GHERKIN_TOKEN_FEATURE);
+  _maybe_end_mode (self, GHERKIN_TOKEN_FeatureLine);
 
   if (priv->lines[priv->symbol_line][strlen ("Feature")] != ':')
     return FALSE;
@@ -171,7 +170,7 @@ _parse_scenario (GherkinParser * self)
   GherkinRule *scenario;
   GherkinParserPrivate *priv = self->priv;
 
-  _maybe_end_mode (self, GHERKIN_TOKEN_SCENARIO);
+  _maybe_end_mode (self, GHERKIN_TOKEN_ScenarioLine);
 
   if (!priv->scenarios) {
     priv->scenario_tags = g_array_new (TRUE, TRUE, sizeof (GherkinRule));
@@ -205,7 +204,7 @@ _parse_table (GherkinParser * self)
   guint i = -1;
   GherkinParserPrivate *priv = self->priv;
 
-  _maybe_end_mode (self, GHERKIN_TOKEN_TABLE);
+  _maybe_end_mode (self, GHERKIN_TOKEN_TableRow);
 
   if (!gherkin_scanner_peek_next_token (priv->scanner))
     return G_TOKEN_NONE;
@@ -213,7 +212,7 @@ _parse_table (GherkinParser * self)
   if (priv->scanner->line != priv->scanner->next_line)
     return G_TOKEN_NONE;
 
-  if ((guint) priv->scanner->next_token == GHERKIN_TOKEN_TABLE) {
+  if ((guint) priv->scanner->next_token == GHERKIN_TOKEN_TableRow) {
     gchar *line = priv->lines[priv->scanner->line - 1];
 
     for (i = priv->scanner->position - 1; line[i] != '|'; i--)
@@ -254,9 +253,11 @@ _parse_table (GherkinParser * self)
 }
 
 static guint
-_parse_step (GherkinParser * self, const gchar * step_name, GherkinToken token)
+_parse_step (GherkinParser * self, GherkinToken token)
 {
+  gint i;
   gchar *tmp;
+  GString * step_name;
   GherkinParserPrivate *priv = self->priv;
   GherkinRule *step;
 
@@ -264,13 +265,18 @@ _parse_step (GherkinParser * self, const gchar * step_name, GherkinToken token)
 
   if (!priv->scenarios)
     return G_TOKEN_NONE;
-
   _set_current_indent (self);
 
+  step_name = g_string_new (NULL);
+
+  for (i = priv->indent_level - 1; priv->lines[priv->symbol_line][i] != ' ' &&
+      priv->lines[priv->symbol_line][i] != ':'; i++)
+    g_string_append_c (step_name, priv->lines[priv->symbol_line][i]);
+
   tmp = g_strdup (&priv->lines[priv->symbol_line][priv->indent_level - 1 +
-          strlen (step_name)]);
+          strlen (step_name->str)]);
   step = gherkin_formatter_start_rule (self->priv->formatter, GHERKIN_RULE_STEP);
-  gherkin_rule_set_keyword (step, step_name);
+  gherkin_rule_set_keyword (step, step_name->str);
   gherkin_rule_set_location (step, priv->symbol_line, priv->indent_level);
   gherkin_step_set_text (step, g_strstrip (tmp));
 
@@ -286,28 +292,19 @@ _parse_token (GherkinParser * self, GherkinToken token)
 
   priv->symbol_line = priv->scanner->line - 1;
   switch (token) {
-    case GHERKIN_TOKEN_FEATURE:
+    case GHERKIN_TOKEN_FeatureLine:
       _parse_feature (self);
       break;
-    case GHERKIN_TOKEN_SCENARIO:
+    case GHERKIN_TOKEN_ScenarioLine:
       _parse_scenario (self);
       break;
-    case GHERKIN_TOKEN_WHEN:
-      _parse_step (self, "When", token);
+    case GHERKIN_TOKEN_StepLine:
+      _parse_step (self, token);
       break;
-    case GHERKIN_TOKEN_THEN:
-      _parse_step (self, "Then", token);
-      break;
-    case GHERKIN_TOKEN_GIVEN:
-      _parse_step (self, "Given ", token);
-      break;
-    case GHERKIN_TOKEN_AND:
-      _parse_step (self, "And ", token);
-      break;
-    case GHERKIN_TOKEN_TABLE:
+    case GHERKIN_TOKEN_TableRow:
       _parse_table (self);
       break;
-    case GHERKIN_TOKEN_TAG:
+    case GHERKIN_TOKEN_TagLine:
     {
       gint i;
       GString *tag_str = g_string_new (NULL);

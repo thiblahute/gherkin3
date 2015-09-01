@@ -30,7 +30,7 @@ const (
 )
 
 func tokenTypeForRule(rt RuleType) TokenType {
-    return TokenType_None
+.    return TokenType_None
 }
 
 func (t TokenType) Name() string {

@@ -14,16 +14,16 @@ typedef struct
 } GherkinSymbols;
 
 static const GherkinSymbols symbols[] = {{
-  "Scenario", GHERKIN_TOKEN_SCENARIO,}, {
-  "Feature", GHERKIN_TOKEN_FEATURE,}, {
-  "When", GHERKIN_TOKEN_WHEN,}, {
-  "Given", GHERKIN_TOKEN_GIVEN,}, {
-  "Then", GHERKIN_TOKEN_THEN,}, {
-  "|", GHERKIN_TOKEN_TABLE,}, {
-  "And", GHERKIN_TOKEN_AND,}, {
-  "@", GHERKIN_TOKEN_TAG,}, {
-  NULL, 0,
-  },
+  "Scenario", GHERKIN_TOKEN_ScenarioLine,}, {
+  "Feature", GHERKIN_TOKEN_FeatureLine,}, {
+  "When", GHERKIN_TOKEN_StepLine,}, {
+  "Given", GHERKIN_TOKEN_StepLine,}, {
+  "Then", GHERKIN_TOKEN_StepLine,}, {
+  "|", GHERKIN_TOKEN_TableRow,}, {
+  "And", GHERKIN_TOKEN_StepLine,}, {
+  "@", GHERKIN_TOKEN_TagLine,},
+  {"#language:" GHERKIN_TOKEN_Language,},
+  {NULL, 0,},
 };
 
 static gboolean
