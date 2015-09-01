@@ -14,7 +14,7 @@ json_glib_dep = dependency('json-glib-1.0')
 inc_dirs = include_directories('gherkin/')
 
 gir = find_program('g-ir-scanner', required : false)
-build_gir = gir.found() and not meson.is_cross_build()
+build_gir = gir.found() and not meson.is_cross_build() and not get_option('disable-introspection')
 gnome = import('gnome')
 
 subdir('gherkin')
